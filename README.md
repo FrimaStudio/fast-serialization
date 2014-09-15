@@ -1,3 +1,7 @@
+Frima modifications
+==================
+We needed to modify the "transient" behaviour to work like Morphia does (include "public transient SomeType someField" and exclude fields with the @Transient annotation).
+
 fast-serialization
 ==================
 

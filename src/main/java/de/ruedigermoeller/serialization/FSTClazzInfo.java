@@ -68,13 +68,13 @@ public final class FSTClazzInfo {
         }
     };
 
-    private static final Set<Class> transientFieldAnnotations = Collections.synchronizedSet(new HashSet<Class>());
+    private static final Set<Class<? extends Annotation>> transientFieldAnnotations = Collections.synchronizedSet(new HashSet<Class<? extends Annotation>>());
 
     /**
      * Makes fields that have this annotation defined act as transient.
      * This bypasses FST's default @Serializable and @Transient annotations since we want it to work like Morphia.
      */
-    public static final void addTransientFieldAnnotation(Class annotationClass) {
+    public static final void addTransientFieldAnnotation(Class<? extends Annotation> annotationClass) {
         transientFieldAnnotations.add(annotationClass);
     }
 
@@ -258,11 +258,16 @@ public final class FSTClazzInfo {
         // if (Modifier.isTransient(field.getModifiers()))
         //     return true;
 
+        // If field is annotated with @Serialize, force serialization.
+        if(field.getAnnotation(Serialize.class) != null) {
+            return false;
+        }
+
         // Check for any Annotatation that was registered to be transient.
         Annotation[] fieldAnnotations = field.getAnnotations();
 
         for(Annotation annotation : fieldAnnotations) {
-            if(transientFieldAnnotations.contains(annotation)) {
+            if(transientFieldAnnotations.contains(annotation.annotationType())) {
                 return true;
             }
         }
@@ -270,7 +275,7 @@ public final class FSTClazzInfo {
         while (c.getName().indexOf("$") >= 0) {
             c = c.getSuperclass(); // patch fuer reallive queries
         }
-        return (c.getAnnotation(Transient.class) != null && field.getAnnotation(Serialize.class) == null);
+        return c.getAnnotation(Transient.class) != null;
     }
 
     public final FSTFieldInfo[] getFieldInfo() {

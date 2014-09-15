@@ -24,6 +24,7 @@ import de.ruedigermoeller.serialization.annotations.*;
 import de.ruedigermoeller.serialization.util.FSTUtil;
 
 import java.io.*;
+import java.lang.annotation.*;
 import java.lang.reflect.*;
 import java.util.*;
 
@@ -66,6 +67,18 @@ public final class FSTClazzInfo {
             return res;
         }
     };
+
+    private static final Set<Class> transientFieldAnnotations = Collections.synchronizedSet(new HashSet<Class>());
+
+    /**
+     * Makes fields that have this annotation defined act as transient.
+     * This bypasses FST's default @Serializable and @Transient annotations since we want it to work like Morphia.
+     */
+    public static final void addTransientFieldAnnotation(Class annotationClass) {
+        transientFieldAnnotations.add(annotationClass);
+    }
+
+
     Class[] predict;
     private boolean ignoreAnn;
     HashMap<String, FSTFieldInfo> fieldMap = new HashMap<String, FSTFieldInfo>(15); // all fields
@@ -241,9 +254,20 @@ public final class FSTClazzInfo {
     }
 
     private boolean isTransient(Class c, Field field) {
-        if ( Modifier.isTransient(field.getModifiers()) )
-            return true;
-        while ( c.getName().indexOf("$") >= 0 ) {
+        // We don't want to skip "true" transient fields since Morphia doesn't.
+        // if (Modifier.isTransient(field.getModifiers()))
+        //     return true;
+
+        // Check for any Annotatation that was registered to be transient.
+        Annotation[] fieldAnnotations = field.getAnnotations();
+
+        for(Annotation annotation : fieldAnnotations) {
+            if(transientFieldAnnotations.contains(annotation)) {
+                return true;
+            }
+        }
+
+        while (c.getName().indexOf("$") >= 0) {
             c = c.getSuperclass(); // patch fuer reallive queries
         }
         return (c.getAnnotation(Transient.class) != null && field.getAnnotation(Serialize.class) == null);

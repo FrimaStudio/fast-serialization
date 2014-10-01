@@ -147,27 +147,36 @@ public class FSTUtil {
     }
 
     public static Constructor findConstructorForSerializable(Class clazz) {
-        Class curCl = clazz;
-        while (Serializable.class.isAssignableFrom(curCl)) {
-            if ((curCl = curCl.getSuperclass()) == null) {
-                return null;
-            }
-        }
+        //We need to use this since newConstructorForSerialization generates a constructor at runtime that does NOT
+        //set the default values in a class (member initializers not ran).
+
         try {
-            Constructor c = curCl.getDeclaredConstructor((Class[]) null);
-            int mods = c.getModifiers();
-            if ((mods & Modifier.PRIVATE) != 0 ||
-                    ((mods & (Modifier.PUBLIC | Modifier.PROTECTED)) == 0 &&
-                            !isPackEq(clazz, curCl)))
-            {
-                return null;
-            }
-            c = ReflectionFactory.getReflectionFactory().newConstructorForSerialization(clazz, c);
-            c.setAccessible(true);
-            return c;
+            return clazz.getDeclaredConstructor((Class[]) null);
         } catch (NoSuchMethodException ex) {
             return null;
         }
+
+        // Class curCl = clazz;
+        // while (Serializable.class.isAssignableFrom(curCl)) {
+        //     if ((curCl = curCl.getSuperclass()) == null) {
+        //         return null;
+        //     }
+        // }
+        // try {
+        //     Constructor c = curCl.getDeclaredConstructor((Class[]) null);
+        //     int mods = c.getModifiers();
+        //     if ((mods & Modifier.PRIVATE) != 0 ||
+        //             ((mods & (Modifier.PUBLIC | Modifier.PROTECTED)) == 0 &&
+        //                     !isPackEq(clazz, curCl)))
+        //     {
+        //         return null;
+        //     }
+        //     c = ReflectionFactory.getReflectionFactory().newConstructorForSerialization(clazz, c);
+        //     c.setAccessible(true);
+        //     return c;
+        // } catch (NoSuchMethodException ex) {
+        //     return null;
+        // }
     }
 
     static boolean isPackEq(Class clazz1, Class clazz2) {

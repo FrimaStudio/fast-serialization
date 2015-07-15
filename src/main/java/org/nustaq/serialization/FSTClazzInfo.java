@@ -15,16 +15,38 @@
  */
 package org.nustaq.serialization;
 
-import org.nustaq.offheap.structs.Align;
-import org.nustaq.serialization.annotations.*;
-import org.nustaq.serialization.util.FSTMap;
-import org.nustaq.serialization.util.FSTUtil;
-
-import java.io.*;
-import java.lang.reflect.*;
-import java.util.*;
+import java.io.Externalizable;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectStreamClass;
+import java.io.ObjectStreamField;
+import java.io.Serializable;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.nustaq.offheap.structs.Align;
+import org.nustaq.serialization.annotations.AnonymousTransient;
+import org.nustaq.serialization.annotations.Conditional;
+import org.nustaq.serialization.annotations.Flat;
+import org.nustaq.serialization.annotations.OneOf;
+import org.nustaq.serialization.annotations.Predict;
+import org.nustaq.serialization.annotations.Serialize;
+import org.nustaq.serialization.annotations.Transient;
+import org.nustaq.serialization.annotations.Version;
+import org.nustaq.serialization.util.FSTMap;
+import org.nustaq.serialization.util.FSTUtil;
 
 /**
  * Created with IntelliJ IDEA.
@@ -34,6 +56,19 @@ import java.util.concurrent.atomic.AtomicInteger;
  * To change this template use File | Settings | File Templates.
  */
 public final class FSTClazzInfo {
+
+	private static final Set<Class<? extends Annotation>> transientFieldAnnotations = Collections
+			.synchronizedSet(new HashSet<Class<? extends Annotation>>());
+
+	/**
+	 * Makes fields that have this annotation defined act as transient. This
+	 * bypasses FST's default @Serializable and @Transient annotations since we
+	 * want it to work like Morphia.
+	 */
+	public static final void addTransientFieldAnnotation(
+			Class<? extends Annotation> annotationClass) {
+		transientFieldAnnotations.add(annotationClass);
+	}
 
     // cache constructor per class (big saving in permspace)
     public static boolean BufferConstructorMeta = true;
@@ -272,14 +307,29 @@ public final class FSTClazzInfo {
     }
 
     private boolean isTransient(Class c, Field field) {
-        if (Modifier.isTransient(field.getModifiers()))
-            return true;
+		// We don't want to skip "true" transient fields since Morphia doesn't.
+		// if (Modifier.isTransient(field.getModifiers()))
+		// return true;
+
+		// If field is annotated with @Serialize, force serialization.
+		if (field.getAnnotation(Serialize.class) != null) {
+			return false;
+		}
+
+		// Check for any Annotation that was registered to be transient.
+		for (Annotation annotation : field.getAnnotations()) {
+			if (transientFieldAnnotations.contains(annotation.annotationType())) {
+				return true;
+			}
+		}
+
         while (c.getName().indexOf("$") >= 0) {
             c = c.getSuperclass(); // patch fuer reallive queries, kontraktor spore
         }
         if ( field.getName().startsWith("this$") && c.getAnnotation(AnonymousTransient.class) != null )
             return true;
-        return (c.getAnnotation(Transient.class) != null && field.getAnnotation(Serialize.class) == null);
+
+		return c.getAnnotation(Transient.class) != null;
     }
 
     public final FSTFieldInfo[] getFieldInfo() {
